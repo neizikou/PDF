@@ -1,0 +1,1178 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes" />
+    <title>PDF 拆分工具（纯键盘输入）</title>
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js">
+    </script>
+    <style>
+        /* ----- 全局重置 & 变量 ----- */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #4F6EF7;
+            --primary-dark: #3A56D4;
+            --primary-light: #E8ECFF;
+            --success: #34C759;
+            --danger: #FF3B30;
+            --gray-50: #F9FAFB;
+            --gray-100: #F3F4F6;
+            --gray-200: #E5E7EB;
+            --gray-300: #D1D5DB;
+            --gray-400: #9CA3AF;
+            --gray-500: #6B7280;
+            --gray-600: #4B5563;
+            --gray-700: #374151;
+            --gray-800: #1F2937;
+            --gray-900: #111827;
+            --radius: 12px;
+            --shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+            --shadow-hover: 0 8px 32px rgba(79, 110, 247, 0.15);
+            --transition: 0.25s ease;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: var(--gray-50);
+            color: var(--gray-800);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 32px 16px;
+        }
+
+        /* ----- 主容器 ----- */
+        .app {
+            max-width: 840px;
+            width: 100%;
+            background: #ffffff;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 40px 36px 48px;
+            transition: box-shadow var(--transition);
+        }
+        .app:hover {
+            box-shadow: var(--shadow-hover);
+        }
+
+        /* ----- 头部 ----- */
+        .header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+        .header .icon {
+            font-size: 40px;
+            display: block;
+            margin-bottom: 6px;
+        }
+        .header h1 {
+            font-size: 28px;
+            font-weight: 700;
+            letter-spacing: -0.3px;
+            color: var(--gray-900);
+        }
+        .header h1 span {
+            color: var(--primary);
+        }
+        .header p {
+            color: var(--gray-500);
+            font-size: 15px;
+            margin-top: 4px;
+        }
+
+        /* ----- 上传区域 ----- */
+        .upload-zone {
+            border: 2px dashed var(--gray-300);
+            border-radius: var(--radius);
+            padding: 48px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color var(--transition), background var(--transition);
+            background: var(--gray-50);
+            position: relative;
+        }
+        .upload-zone:hover {
+            border-color: var(--primary);
+            background: var(--primary-light);
+        }
+        .upload-zone.dragover {
+            border-color: var(--primary);
+            background: var(--primary-light);
+            transform: scale(1.005);
+        }
+        .upload-zone .upload-icon {
+            font-size: 52px;
+            display: block;
+            margin-bottom: 10px;
+        }
+        .upload-zone .upload-text {
+            font-size: 17px;
+            font-weight: 500;
+            color: var(--gray-700);
+        }
+        .upload-zone .upload-hint {
+            font-size: 14px;
+            color: var(--gray-400);
+            margin-top: 4px;
+        }
+        .upload-zone input[type="file"] {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        /* ----- 文件信息 ----- */
+        .file-info {
+            display: none;
+            align-items: center;
+            gap: 16px;
+            padding: 16px 20px;
+            background: var(--primary-light);
+            border-radius: var(--radius);
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+        .file-info.active {
+            display: flex;
+        }
+        .file-info .file-icon {
+            font-size: 32px;
+            flex-shrink: 0;
+        }
+        .file-info .file-details {
+            flex: 1;
+            min-width: 120px;
+        }
+        .file-info .file-name {
+            font-weight: 600;
+            font-size: 15px;
+            color: var(--gray-800);
+            word-break: break-all;
+        }
+        .file-info .file-meta {
+            font-size: 13px;
+            color: var(--gray-500);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 2px;
+        }
+        .file-info .file-meta span {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .file-info .btn-change {
+            padding: 6px 16px;
+            background: #ffffff;
+            border: 1px solid var(--gray-300);
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--gray-600);
+            cursor: pointer;
+            transition: var(--transition);
+            flex-shrink: 0;
+        }
+        .file-info .btn-change:hover {
+            background: var(--gray-100);
+            border-color: var(--gray-400);
+        }
+
+        /* ----- 拆分设置 (纯文本输入) ----- */
+        .settings {
+            margin-top: 24px;
+        }
+        .settings .row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px 20px;
+            align-items: flex-start;
+        }
+        .settings .field {
+            flex: 2;
+            min-width: 260px;
+        }
+        .settings .field label {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--gray-700);
+            margin-bottom: 6px;
+        }
+        .settings .field .hint {
+            font-size: 13px;
+            color: var(--gray-400);
+            font-weight: 400;
+            margin-left: 4px;
+        }
+
+        /* 范围行 - 使用 text input 模拟数字输入 */
+        .range-rows {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        .range-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+            background: var(--gray-50);
+            padding: 6px 10px 6px 14px;
+            border-radius: 10px;
+            border: 1px solid var(--gray-200);
+            transition: border-color var(--transition);
+        }
+        .range-row:hover {
+            border-color: var(--gray-300);
+        }
+        .range-row .row-label {
+            font-size: 13px;
+            color: var(--gray-500);
+            font-weight: 500;
+            margin-right: 2px;
+        }
+        .range-row input[type="text"] {
+            width: 70px;
+            padding: 8px 4px 8px 8px;
+            border: 1.5px solid var(--gray-200);
+            border-radius: 8px;
+            font-size: 15px;
+            background: #fff;
+            color: var(--gray-800);
+            outline: none;
+            transition: border-color var(--transition), box-shadow var(--transition);
+            text-align: left;
+            /* 移除默认数字箭头 */
+            -moz-appearance: textfield;
+            appearance: textfield;
+            /* 确保移动端键盘为数字 */
+            inputmode: numeric;
+            pattern: [0-9]*;
+        }
+        .range-row input[type="text"]:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(79, 110, 247, 0.12);
+        }
+        /* 移除所有可能出现的箭头 */
+        .range-row input[type="text"]::-webkit-outer-spin-button,
+        .range-row input[type="text"]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        .range-row input[type="text"] {
+            -moz-appearance: textfield;
+        }
+
+        .range-row .range-dash {
+            color: var(--gray-400);
+            font-weight: 600;
+            padding: 0 2px;
+            user-select: none;
+        }
+        .range-row .btn-remove-range {
+            background: transparent;
+            border: none;
+            color: var(--gray-400);
+            font-size: 20px;
+            line-height: 1;
+            padding: 0 6px;
+            cursor: pointer;
+            transition: color var(--transition), background var(--transition);
+            border-radius: 6px;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .range-row .btn-remove-range:hover:not(:disabled) {
+            color: var(--danger);
+            background: #FEF2F2;
+        }
+        .range-row .btn-remove-range:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .btn-add-range {
+            background: transparent;
+            border: 1.5px dashed var(--gray-300);
+            border-radius: 8px;
+            padding: 8px 18px;
+            color: var(--primary);
+            font-weight: 500;
+            font-size: 14px;
+            cursor: pointer;
+            transition: var(--transition);
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 2px;
+        }
+        .btn-add-range:hover {
+            background: var(--primary-light);
+            border-color: var(--primary);
+        }
+
+        /* 前缀字段 */
+        .settings .field-prefix {
+            flex: 1;
+            min-width: 150px;
+        }
+        .settings .field-prefix input {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1.5px solid var(--gray-200);
+            border-radius: 8px;
+            font-size: 15px;
+            transition: border-color var(--transition), box-shadow var(--transition);
+            background: #fff;
+            color: var(--gray-800);
+            outline: none;
+        }
+        .settings .field-prefix input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(79, 110, 247, 0.15);
+        }
+
+        .settings .total-pages-hint {
+            font-size: 14px;
+            color: var(--gray-500);
+            margin-top: 12px;
+            padding: 8px 14px;
+            background: var(--gray-50);
+            border-radius: 8px;
+            display: inline-block;
+        }
+        .settings .total-pages-hint strong {
+            color: var(--gray-800);
+        }
+
+        /* ----- 按钮 ----- */
+        .btn-primary {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 40px;
+            background: var(--primary);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background var(--transition), transform var(--transition), box-shadow var(--transition);
+            box-shadow: 0 2px 8px rgba(79, 110, 247, 0.25);
+            margin-top: 20px;
+            width: 100%;
+        }
+        .btn-primary:hover:not(:disabled) {
+            background: var(--primary-dark);
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(79, 110, 247, 0.3);
+        }
+        .btn-primary:active:not(:disabled) {
+            transform: translateY(0);
+        }
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        .btn-primary .spinner {
+            display: none;
+            width: 20px;
+            height: 20px;
+            border: 2.5px solid rgba(255, 255, 255, 0.3);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+        }
+        .btn-primary.loading .spinner {
+            display: inline-block;
+        }
+        .btn-primary.loading .btn-text {
+            display: none;
+        }
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* ----- 结果区域 ----- */
+        .result {
+            display: none;
+            margin-top: 28px;
+            padding-top: 28px;
+            border-top: 1.5px solid var(--gray-200);
+        }
+        .result.active {
+            display: block;
+        }
+        .result .result-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 8px 16px;
+            margin-bottom: 16px;
+        }
+        .result .result-header h2 {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--gray-800);
+        }
+        .result .result-header h2 .badge {
+            background: var(--success);
+            color: #fff;
+            font-size: 14px;
+            font-weight: 600;
+            padding: 0 12px;
+            border-radius: 20px;
+            margin-left: 8px;
+            display: inline-block;
+            line-height: 26px;
+        }
+        .result .file-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .result .file-card {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 14px 18px;
+            background: var(--gray-50);
+            border-radius: 10px;
+            transition: background var(--transition);
+            flex-wrap: wrap;
+        }
+        .result .file-card:hover {
+            background: var(--primary-light);
+        }
+        .result .file-card .card-icon {
+            font-size: 26px;
+            flex-shrink: 0;
+        }
+        .result .file-card .card-info {
+            flex: 1;
+            min-width: 120px;
+        }
+        .result .file-card .card-name {
+            font-weight: 500;
+            font-size: 14px;
+            color: var(--gray-800);
+            word-break: break-all;
+        }
+        .result .file-card .card-meta {
+            font-size: 13px;
+            color: var(--gray-500);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .result .file-card .btn-download {
+            padding: 6px 18px;
+            background: #fff;
+            border: 1.5px solid var(--primary);
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--primary);
+            cursor: pointer;
+            transition: var(--transition);
+            flex-shrink: 0;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .result .file-card .btn-download:hover {
+            background: var(--primary);
+            color: #fff;
+        }
+
+        /* ----- 消息 ----- */
+        .message {
+            margin-top: 16px;
+            padding: 12px 18px;
+            border-radius: 8px;
+            font-size: 14px;
+            display: none;
+        }
+        .message.error {
+            display: block;
+            background: #FEF2F2;
+            color: #991B1B;
+            border: 1px solid #FECACA;
+        }
+        .message.success {
+            display: block;
+            background: #F0FDF4;
+            color: #166534;
+            border: 1px solid #BBF7D0;
+        }
+        .message.info {
+            display: block;
+            background: #EFF6FF;
+            color: #1E40AF;
+            border: 1px solid #BFDBFE;
+        }
+
+        /* ----- 响应式 (手机适配) ----- */
+        @media (max-width: 640px) {
+            .app {
+                padding: 24px 16px 32px;
+            }
+            .header h1 {
+                font-size: 22px;
+            }
+            .upload-zone {
+                padding: 32px 16px;
+            }
+            .upload-zone .upload-icon {
+                font-size: 40px;
+            }
+            .settings .row {
+                flex-direction: column;
+                gap: 12px;
+            }
+            .settings .field,
+            .settings .field-prefix {
+                min-width: 100%;
+            }
+            .range-row {
+                padding: 8px 10px;
+                gap: 4px;
+            }
+            .range-row input[type="text"] {
+                width: 60px;
+                font-size: 16px;
+                padding: 8px 2px 8px 6px;
+                min-height: 44px;
+            }
+            .range-row .range-dash {
+                padding: 0 0px;
+            }
+            .range-row .btn-remove-range {
+                width: 36px;
+                height: 36px;
+                font-size: 22px;
+            }
+            .file-info {
+                flex-direction: column;
+                align-items: stretch;
+                text-align: center;
+            }
+            .file-info .btn-change {
+                align-self: center;
+            }
+            .result .file-card {
+                flex-direction: column;
+                align-items: stretch;
+                text-align: center;
+            }
+            .result .file-card .btn-download {
+                align-self: center;
+            }
+            .btn-primary {
+                padding: 12px 20px;
+                font-size: 15px;
+            }
+        }
+
+        /* 针对小屏手机进一步优化 */
+        @media (max-width: 400px) {
+            .range-row input[type="text"] {
+                width: 52px;
+                font-size: 15px;
+                padding: 6px 2px;
+            }
+            .range-row {
+                padding: 6px 6px;
+                gap: 2px;
+            }
+        }
+
+        .hidden {
+            display: none !important;
+        }
+        .mt-8 {
+            margin-top: 8px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="app" id="app">
+        <!-- 头部 -->
+        <div class="header">
+            <span class="icon">📄</span>
+            <h1>PDF <span>拆分</span>工具</h1>
+            <p>上传 PDF，直接输入页数范围，一键拆分</p>
+        </div>
+
+        <!-- 上传区域 -->
+        <div class="upload-zone" id="uploadZone">
+            <span class="upload-icon">📤</span>
+            <div class="upload-text">点击上传或拖拽 PDF 文件</div>
+            <div class="upload-hint">仅支持 .pdf 文件</div>
+            <input type="file" id="fileInput" accept=".pdf" />
+        </div>
+
+        <!-- 文件信息 -->
+        <div class="file-info" id="fileInfo">
+            <span class="file-icon">📎</span>
+            <div class="file-details">
+                <div class="file-name" id="fileName">document.pdf</div>
+                <div class="file-meta">
+                    <span id="fileSize">0 KB</span>
+                    <span>📄 共 <strong id="totalPages">0</strong> 页</span>
+                </div>
+            </div>
+            <button class="btn-change" id="btnChangeFile">更换文件</button>
+        </div>
+
+        <!-- 拆分设置 -->
+        <div class="settings" id="settingsArea" style="display:none;">
+            <div class="row">
+                <!-- 页数范围 (纯文本输入) -->
+                <div class="field">
+                    <label>📌 页数范围 <span class="hint">（直接输入数字，起始-结束）</span></label>
+                    <div class="range-rows" id="rangeRows">
+                        <!-- 由 JavaScript 动态生成 -->
+                    </div>
+                    <button class="btn-add-range" id="addRangeBtn">＋ 添加范围</button>
+                </div>
+
+                <!-- 文件名前缀 -->
+                <div class="field-prefix">
+                    <label>🏷️ 文件名前缀</label>
+                    <input type="text" id="prefixInput" placeholder="split" value="split" />
+                </div>
+            </div>
+
+            <div class="total-pages-hint" id="totalPagesHint">
+                📖 共 <strong id="hintPages">0</strong> 页，请输入要拆分的页数范围
+            </div>
+
+            <button class="btn-primary" id="btnSplit">
+                <span class="spinner"></span>
+                <span class="btn-text">⚡ 拆分 PDF</span>
+            </button>
+        </div>
+
+        <!-- 消息 -->
+        <div class="message" id="message"></div>
+
+        <!-- 结果 -->
+        <div class="result" id="resultArea">
+            <div class="result-header">
+                <h2>
+                    ✅ 拆分完成
+                    <span class="badge" id="resultBadge">0 个文件</span>
+                </h2>
+            </div>
+            <div class="file-list" id="fileList"></div>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            'use strict';
+
+            // ----- DOM 引用 -----
+            const uploadZone = document.getElementById('uploadZone');
+            const fileInput = document.getElementById('fileInput');
+            const fileInfo = document.getElementById('fileInfo');
+            const fileName = document.getElementById('fileName');
+            const fileSize = document.getElementById('fileSize');
+            const totalPages = document.getElementById('totalPages');
+            const hintPages = document.getElementById('hintPages');
+            const settingsArea = document.getElementById('settingsArea');
+            const rangeRows = document.getElementById('rangeRows');
+            const addRangeBtn = document.getElementById('addRangeBtn');
+            const prefixInput = document.getElementById('prefixInput');
+            const btnSplit = document.getElementById('btnSplit');
+            const message = document.getElementById('message');
+            const resultArea = document.getElementById('resultArea');
+            const fileList = document.getElementById('fileList');
+            const resultBadge = document.getElementById('resultBadge');
+            const btnChangeFile = document.getElementById('btnChangeFile');
+
+            // ----- 状态 -----
+            let pdfFile = null;
+            let pdfArrayBuffer = null;
+            let pdfDoc = null;
+            let totalPageCount = 0;
+            let isProcessing = false;
+            let rowCounter = 0;
+
+            // ----- 工具函数 -----
+            function formatSize(bytes) {
+                if (bytes < 1024) return bytes + ' B';
+                if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+                return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+            }
+
+            // ----- 显示消息 -----
+            function showMessage(text, type) {
+                message.className = 'message ' + type;
+                message.textContent = text;
+                message.style.display = 'block';
+            }
+
+            function hideMessage() {
+                message.className = 'message';
+                message.style.display = 'none';
+            }
+
+            // ----- 重置结果 -----
+            function resetResult() {
+                resultArea.classList.remove('active');
+                fileList.innerHTML = '';
+                resultBadge.textContent = '0 个文件';
+            }
+
+            // ----- 修正单个输入框的值（过滤非数字，限制范围）-----
+            function sanitizeInput(input, maxVal) {
+                let val = input.value.replace(/[^0-9]/g, ''); // 只保留数字
+                if (val === '') {
+                    input.value = '1';
+                    return;
+                }
+                let num = parseInt(val, 10);
+                if (isNaN(num) || num < 1) num = 1;
+                if (num > maxVal) num = maxVal;
+                input.value = num;
+            }
+
+            // ----- 更新所有输入框的max并修正值 -----
+            function updateRangeInputsMax(total) {
+                const inputs = rangeRows.querySelectorAll('input[type="text"]');
+                inputs.forEach(input => {
+                    // 更新 max 属性（用于校验）
+                    input.dataset.max = total;
+                    sanitizeInput(input, total);
+                });
+            }
+
+            // ----- 创建一行范围输入 -----
+            function addRangeRow(startVal, endVal) {
+                const total = totalPageCount || 1;
+                const row = document.createElement('div');
+                row.className = 'range-row';
+                row.dataset.rowId = rowCounter++;
+
+                // 起始页输入 (text，仅数字)
+                const startInput = document.createElement('input');
+                startInput.type = 'text';
+                startInput.className = 'start-page-input';
+                startInput.inputMode = 'numeric';
+                startInput.pattern = '[0-9]*';
+                startInput.dataset.max = total;
+                startInput.value = Math.min(Math.max(startVal, 1), total);
+
+                // 分隔符
+                const dash = document.createElement('span');
+                dash.className = 'range-dash';
+                dash.textContent = '—';
+
+                // 结束页输入
+                const endInput = document.createElement('input');
+                endInput.type = 'text';
+                endInput.className = 'end-page-input';
+                endInput.inputMode = 'numeric';
+                endInput.pattern = '[0-9]*';
+                endInput.dataset.max = total;
+                endInput.value = Math.min(Math.max(endVal, startVal, 1), total);
+
+                // 删除按钮
+                const delBtn = document.createElement('button');
+                delBtn.className = 'btn-remove-range';
+                delBtn.textContent = '✕';
+                delBtn.type = 'button';
+                delBtn.addEventListener('click', function() {
+                    const rows = rangeRows.querySelectorAll('.range-row');
+                    if (rows.length > 1) {
+                        row.remove();
+                        updateRemoveButtons();
+                    } else {
+                        showMessage('至少保留一组页数范围', 'info');
+                        setTimeout(hideMessage, 2000);
+                    }
+                });
+
+                // 输入事件：实时过滤非数字，并限制范围
+                const handleInput = function(e) {
+                    const input = e.target;
+                    const max = parseInt(input.dataset.max, 10) || totalPageCount || 1;
+                    // 过滤非数字字符
+                    input.value = input.value.replace(/[^0-9]/g, '');
+                    // 如果为空，不做强制，但blur时会修正
+                };
+
+                // 失焦时修正值
+                const handleBlur = function(e) {
+                    const input = e.target;
+                    const max = parseInt(input.dataset.max, 10) || totalPageCount || 1;
+                    sanitizeInput(input, max);
+                };
+
+                startInput.addEventListener('input', handleInput);
+                startInput.addEventListener('blur', handleBlur);
+                endInput.addEventListener('input', handleInput);
+                endInput.addEventListener('blur', handleBlur);
+
+                // 额外：当用户按Enter时，可以触发拆分，但全局已有监听
+
+                row.appendChild(startInput);
+                row.appendChild(dash);
+                row.appendChild(endInput);
+                row.appendChild(delBtn);
+
+                rangeRows.appendChild(row);
+                updateRemoveButtons();
+
+                return row;
+            }
+
+            // ----- 重置所有范围行（清空并添加默认行 1-totalPages）-----
+            function resetRangeRows(total) {
+                rangeRows.innerHTML = '';
+                rowCounter = 0;
+                if (total > 0) {
+                    addRangeRow(1, total);
+                }
+                updateRemoveButtons();
+            }
+
+            // ----- 更新删除按钮状态 -----
+            function updateRemoveButtons() {
+                const rows = rangeRows.querySelectorAll('.range-row');
+                const removeBtns = rangeRows.querySelectorAll('.btn-remove-range');
+                if (rows.length <= 1) {
+                    removeBtns.forEach(btn => btn.disabled = true);
+                } else {
+                    removeBtns.forEach(btn => btn.disabled = false);
+                }
+            }
+
+            // ----- 加载 PDF -----
+            async function loadPDF(file) {
+                const arrayBuffer = await file.arrayBuffer();
+                const doc = await window.PDFLib.PDFDocument.load(arrayBuffer, { ignoreEncryption: true });
+                const pageCount = doc.getPageCount();
+                return { arrayBuffer, doc, pageCount };
+            }
+
+            // ----- 处理文件上传 -----
+            async function handleFile(file) {
+                hideMessage();
+                resetResult();
+
+                if (!file || file.type !== 'application/pdf') {
+                    showMessage('请上传有效的 PDF 文件', 'error');
+                    return;
+                }
+                if (file.size > 100 * 1024 * 1024) {
+                    showMessage('文件过大，请上传小于 100MB 的 PDF', 'error');
+                    return;
+                }
+
+                try {
+                    const result = await loadPDF(file);
+                    pdfFile = file;
+                    pdfArrayBuffer = result.arrayBuffer;
+                    pdfDoc = result.doc;
+                    totalPageCount = result.pageCount;
+
+                    // 更新 UI
+                    fileName.textContent = file.name;
+                    fileSize.textContent = formatSize(file.size);
+                    totalPages.textContent = totalPageCount;
+                    hintPages.textContent = totalPageCount;
+                    document.getElementById('totalPagesHint').querySelector('strong').textContent = totalPageCount;
+
+                    fileInfo.classList.add('active');
+                    settingsArea.style.display = 'block';
+
+                    // 重置范围行：默认 1 到 totalPageCount
+                    resetRangeRows(totalPageCount);
+                    // 更新所有输入框的max并修正值
+                    updateRangeInputsMax(totalPageCount);
+
+                    showMessage(`✅ 已加载 "${file.name}"，共 ${totalPageCount} 页`, 'success');
+                } catch (err) {
+                    console.error(err);
+                    showMessage('加载 PDF 失败：' + err.message, 'error');
+                }
+            }
+
+            // ----- 执行拆分 -----
+            async function performSplit() {
+                if (isProcessing) return;
+                if (!pdfDoc || totalPageCount === 0) {
+                    showMessage('请先上传一个有效的 PDF 文件', 'error');
+                    return;
+                }
+
+                // 收集所有范围
+                const rows = rangeRows.querySelectorAll('.range-row');
+                if (rows.length === 0) {
+                    showMessage('请至少添加一组页数范围', 'error');
+                    return;
+                }
+
+                const ranges = [];
+                let hasError = false;
+                for (const row of rows) {
+                    const startInput = row.querySelector('.start-page-input');
+                    const endInput = row.querySelector('.end-page-input');
+                    // 先修正值（防止未触发blur）
+                    const max = totalPageCount;
+                    sanitizeInput(startInput, max);
+                    sanitizeInput(endInput, max);
+                    let start = parseInt(startInput.value, 10);
+                    let end = parseInt(endInput.value, 10);
+                    if (isNaN(start) || isNaN(end) || start < 1 || end < 1) {
+                        showMessage('检测到无效的页数，请重新输入', 'error');
+                        hasError = true;
+                        break;
+                    }
+                    // 如果起始大于结束，自动交换（并同步值）
+                    if (start > end) {
+                        [start, end] = [end, start];
+                        startInput.value = start;
+                        endInput.value = end;
+                    }
+                    if (start > totalPageCount || end > totalPageCount) {
+                        showMessage(`页数范围 ${start}-${end} 超出总页数 (1-${totalPageCount})`, 'error');
+                        hasError = true;
+                        break;
+                    }
+                    ranges.push([start, end]);
+                }
+                if (hasError) return;
+
+                // 检查重复范围（提示）
+                const rangeSet = new Set(ranges.map(r => `${r[0]}-${r[1]}`));
+                if (rangeSet.size !== ranges.length) {
+                    showMessage('⚠️ 检测到重复的页数范围，拆分后会产生相同内容的文件', 'info');
+                    setTimeout(hideMessage, 2500);
+                }
+
+                const prefix = prefixInput.value.trim() || 'split';
+
+                isProcessing = true;
+                btnSplit.disabled = true;
+                btnSplit.classList.add('loading');
+                hideMessage();
+                resetResult();
+
+                try {
+                    const results = [];
+                    for (let idx = 0; idx < ranges.length; idx++) {
+                        const [start, end] = ranges[idx];
+                        const pageIndices = [];
+                        for (let i = start - 1; i < end; i++) {
+                            pageIndices.push(i);
+                        }
+
+                        const newDoc = await window.PDFLib.PDFDocument.create();
+                        const copiedPages = await newDoc.copyPages(pdfDoc, pageIndices);
+                        for (const page of copiedPages) {
+                            newDoc.addPage(page);
+                        }
+                        const bytes = await newDoc.save();
+
+                        let suffix = `${start}-${end}`;
+                        if (start === end) suffix = `${start}`;
+                        const filename = `${prefix}_${suffix}.pdf`;
+
+                        results.push({
+                            filename,
+                            bytes,
+                            size: bytes.length,
+                            start,
+                            end,
+                        });
+                    }
+
+                    displayResults(results);
+                    showMessage(`✅ 拆分完成！共生成 ${results.length} 个 PDF 文件`, 'success');
+                } catch (err) {
+                    console.error(err);
+                    showMessage('拆分失败：' + err.message, 'error');
+                } finally {
+                    isProcessing = false;
+                    btnSplit.disabled = false;
+                    btnSplit.classList.remove('loading');
+                }
+            }
+
+            // ----- 显示结果 -----
+            function displayResults(results) {
+                fileList.innerHTML = '';
+                for (const item of results) {
+                    const card = document.createElement('div');
+                    card.className = 'file-card';
+
+                    const icon = document.createElement('span');
+                    icon.className = 'card-icon';
+                    icon.textContent = '📄';
+
+                    const info = document.createElement('div');
+                    info.className = 'card-info';
+                    const name = document.createElement('div');
+                    name.className = 'card-name';
+                    name.textContent = item.filename;
+                    const meta = document.createElement('div');
+                    meta.className = 'card-meta';
+                    const pageRange = item.start === item.end ?
+                        `第 ${item.start} 页` :
+                        `第 ${item.start}-${item.end} 页`;
+                    meta.innerHTML = `
+                        <span>📑 ${pageRange}</span>
+                        <span>📦 ${formatSize(item.size)}</span>
+                    `;
+
+                    info.appendChild(name);
+                    info.appendChild(meta);
+
+                    const btn = document.createElement('button');
+                    btn.className = 'btn-download';
+                    btn.innerHTML = '⬇️ 下载';
+                    btn.addEventListener('click', function() {
+                        downloadFile(item.bytes, item.filename);
+                    });
+
+                    card.appendChild(icon);
+                    card.appendChild(info);
+                    card.appendChild(btn);
+                    fileList.appendChild(card);
+                }
+
+                resultBadge.textContent = `${results.length} 个文件`;
+                resultArea.classList.add('active');
+            }
+
+            // ----- 下载文件 -----
+            function downloadFile(bytes, filename) {
+                const blob = new Blob([bytes], { type: 'application/pdf' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                setTimeout(() => URL.revokeObjectURL(url), 5000);
+            }
+
+            // ----- 重置上传状态 -----
+            function resetUpload() {
+                pdfFile = null;
+                pdfArrayBuffer = null;
+                pdfDoc = null;
+                totalPageCount = 0;
+                fileInfo.classList.remove('active');
+                settingsArea.style.display = 'none';
+                resetResult();
+                hideMessage();
+                fileInput.value = '';
+                rangeRows.innerHTML = '';
+                document.getElementById('totalPagesHint').querySelector('strong').textContent = '0';
+                totalPages.textContent = '0';
+                fileName.textContent = 'document.pdf';
+                fileSize.textContent = '0 KB';
+            }
+
+            // ----- 事件绑定 -----
+
+            // 文件选择
+            fileInput.addEventListener('change', function(e) {
+                if (this.files && this.files.length > 0) {
+                    handleFile(this.files[0]);
+                }
+                this.value = '';
+            });
+
+            // 拖拽上传
+            uploadZone.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                this.classList.add('dragover');
+            });
+            uploadZone.addEventListener('dragleave', function(e) {
+                e.preventDefault();
+                this.classList.remove('dragover');
+            });
+            uploadZone.addEventListener('drop', function(e) {
+                e.preventDefault();
+                this.classList.remove('dragover');
+                const files = e.dataTransfer.files;
+                if (files && files.length > 0) {
+                    handleFile(files[0]);
+                }
+            });
+
+            // 点击上传区域触发文件选择
+            uploadZone.addEventListener('click', function(e) {
+                if (e.target.tagName === 'INPUT') return;
+                fileInput.click();
+            });
+
+            // 更换文件
+            btnChangeFile.addEventListener('click', function() {
+                resetUpload();
+                fileInput.click();
+            });
+
+            // 添加范围
+            addRangeBtn.addEventListener('click', function() {
+                if (totalPageCount > 0) {
+                    addRangeRow(1, totalPageCount);
+                    // 更新所有input的max（新行已有正确max）
+                } else {
+                    showMessage('请先上传 PDF 文件', 'info');
+                    setTimeout(hideMessage, 1500);
+                }
+            });
+
+            // 拆分按钮
+            btnSplit.addEventListener('click', performSplit);
+
+            // 键盘快捷键：在任意输入框中按 Enter 触发拆分
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' && e.target.closest('.range-row input[type="text"]')) {
+                    e.preventDefault();
+                    btnSplit.click();
+                }
+            });
+
+            // 初始化
+            settingsArea.style.display = 'none';
+            fileInfo.classList.remove('active');
+            resetResult();
+            rangeRows.innerHTML = '';
+
+            console.log('📄 PDF 拆分工具已加载 (纯键盘输入)');
+        })();
+    </script>
+
+</body>
+</html>
